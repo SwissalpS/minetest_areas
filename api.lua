@@ -119,55 +119,50 @@ function areas:canInteract(pos, name)
 	if minetest.check_player_privs(name, self.adminPrivs) then
 		return true
 	end
-	if areas.config.use_smallest_area_precedence then
-		local area = self:getSmallestAreaAtPos(pos)
-		-- No area, player owns it or area is open
-		if not area
-			or area.owner == name
-			or area.open
-		then
-			return true
-		elseif areas.factions_available and area.faction_open then
-			if (factions.version or 0) < 2 then
-				local faction_name = factions.get_player_faction(name)
-				if faction_name then
-					for _, fname in ipairs(area.faction_open or {}) do
-						if faction_name == fname then
-							return true
-						end
-					end
-				end
-			else
-				for _, fname in ipairs(area.faction_open or {}) do
-					if factions.player_is_in_faction(fname, name) then
+	local function canInteractFaction(name, area)
+		if not (areas.factions_available and area.faction_open) then
+			return false
+		end
+		if (factions.version or 0) < 2 then
+			local faction_name = factions.get_player_faction(name)
+			if faction_name then
+				for _, fname in ipairs(area.faction_open) do
+					if faction_name == fname then
 						return true
 					end
 				end
 			end
+		else
+			for _, fname in ipairs(area.faction_open) do
+				if factions.player_is_in_faction(fname, name) then
+					return true
+				end
+			end
+		end
+		return false
+	end
+	if areas.config.use_smallest_area_precedence then
+		local area = self:getSmallestAreaAtPos(pos)
+		-- No area, player owns it, area is open
+		-- or player belongs to faction of the area
+		if not area
+			or area.owner == name
+			or area.open
+			or canInteractFaction(name, area)
+		then
+			return true
 		end
 		return false
 	else
 		local owned = false
 		for _, area in pairs(self:getAreasAtPos(pos)) do
-			if area.owner == name or area.open then
+			-- Player owns the area, area is open
+			-- or player belongs to faction of the area
+			if area.owner == name
+				or area.open
+				or canInteractFaction(name, area)
+			then
 				return true
-			elseif areas.factions_available and area.faction_open then
-				if (factions.version or 0) < 2 then
-					local faction_name = factions.get_player_faction(name)
-					if faction_name then
-						for _, fname in ipairs(area.faction_open or {}) do
-							if faction_name == fname then
-								return true
-							end
-						end
-					end
-				else
-					for _, fname in ipairs(area.faction_open or {}) do
-						if factions.player_is_in_faction(fname, name) then
-							return true
-						end
-					end
-				end
 			end
 			owned = true
 		end
